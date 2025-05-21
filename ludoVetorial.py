@@ -12,68 +12,62 @@ class Player_Vector:    # Jogador de Ludo (usando a representação vetorial).
         self.order = self.number_players
         self.number_players += 1
 
-        self.home_pawns = 4
-        self.walk = np.zeros(59)
+        self.walk = np.zeros(58)
+        self.walk[0] = 4;
 
     def play_turn(self, oponents):
 
         dice_roll = random.randint(1, 6)
-        print(dice_roll)
+        print("Valor do dado: ", dice_roll);
 
-        if (self.home_pawns == 4):                            # Se não houver peões para andar.
-            if (dice_roll == 1 or dice_roll == 6):
 
-                self.free_pawn()
 
-                if (dice_roll == 6):
-                    return self.play_turn(oponents)
-                else:
-                    return False
-            else:
-                return False
+        choice = self.choose_random(dice_roll)
+
+        print("Choice:",  choice)
+
+        if (choice == 0):
+            self.free_pawn()
+        elif choice == None:
+            return False;
         else:
-
-            choice = self.choose_random(dice_roll)
-
-            print("Choice:",  choice)
-
-            if (choice == "Libertar"):
-                self.free_pawn()
-            else:
-                self.walk_pawn(choice, dice_roll)
-                if (self.walk[58] == 4):
-                    return True
+            self.walk_pawn(choice, dice_roll)
+            if (self.walk[57] == 4):
+                return True
                 
-            if (dice_roll == 6):
-                return self.play_turn(oponents)
-            else:
-                return False
+        if (dice_roll == 6):
+            self.print_state();
+            return self.play_turn(oponents)
+        else:
+            return False
 
     def free_pawn(self):             # Libertar um peão.
          
-        self.home_pawns -= 1
-
-        self.walk[0] += 1
+        self.walk[0] -= 1;
+        self.walk[1] += 1;
 
         return
 
     def choose_random(self, dice_roll):
 
         indexes_walk = np.nonzero(self.walk[:-1])
+        indexes_walk = list(indexes_walk[0]);
 
-        if ((dice_roll == 1 or dice_roll == 6) and self.home_pawns != 0):
-            choices = ["Libertar"] + list(indexes_walk[0])
-        else:
-            choices = list(indexes_walk[0])
+        if dice_roll != 1 and dice_roll != 6:
+            if indexes_walk[0] == 0:
+                indexes_walk = indexes_walk[1:];
 
-        return choices[random.randint(0, len(choices) - 1)]
+        if len(indexes_walk) == 0:
+            return None;
+        return indexes_walk[random.randint(0, len(indexes_walk) - 1)]
+
 
     def walk_pawn(self, choice, dice_roll):
-        if (choice + dice_roll <= 58):
+        if (choice + dice_roll <= 57):
             self.walk[choice + dice_roll] += self.walk[choice]
             self.walk[choice] = 0
         else:
-            aux = 58 - (dice_roll + choice - 58)
+            aux = 57 - (dice_roll + choice - 57)
 
             if (aux != choice):
                 self.walk[aux] += self.walk[choice]
@@ -90,3 +84,6 @@ while (not flag):
     flag = amarelo.play_turn([])
     amarelo.print_state()
     input()
+    if flag == True:
+        print("Tamo junto");
+
