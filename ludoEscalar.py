@@ -1,18 +1,22 @@
 import random
-from tkinter import * 
 
-DISTANCE = 13 # Distância entre a entrada de um jogador e o próximo.
+NEIGHBOR_DISTANCE = 13  # Distância entre a entrada de um jogador e o próximo.
 
-class Player_Scalar:
-    def __init__(self, name, order):
+class Player_Scalar:    # Jogador de Ludo (usando a representação escalar).
+
+    number_players = 0 
+
+    def __init__(self, name):
         self.name = name
-        self.order = order
-        self.relative_start = DISTANCE*order + 1
+        self.order = self.number_players
+        self.number_players += 1
+        self.relative_start = NEIGHBOR_DISTANCE * self.order + 1
         self.relative_end = self.relative_start + 58
 
-        self.home_pawns = 4
-        self.free_pawns = []
-        self.end_pawns = 0
+        self.home_pawns = 4   # Peões presos.
+        self.free_pawns = []  # Peões andando.
+        self.safe_pawns = []  # Peões no último corredor.
+        self.end_pawns = 0    # Peões no final.
 
     def choose(self, dice_roll):
         if (self.home_pawns != 0 and (dice_roll == 1 or dice_roll == 6)):
@@ -105,26 +109,24 @@ class Player_Scalar:
                 return False
             
 amarelo = Player_Scalar("amarelo", 0)
-flag = False
-while (not flag):
-    print()
-    flag = amarelo.play_turn([])
-    amarelo.print_state()
-    input()
+verme = Player_Scalar("amarelo", 0)
+dsaverme = Player_Scalar("amarelo", 0)
+rewtwe = Player_Scalar("amarelo", 0)
+verde = Player_Scalar("amarelo", 0)
 
-# root = Tk()
+print(verde)
 
-# class Application():
-#     def __init__(self):
-#         self.root = root
-#         self.tela()
-#         root.mainloop()
-    
-#     def tela(self):
-#         self.root.title("Ludo")
-#         self.root.configure(background="darkgray")
-#         self.root.geometry("1000x800")
-#         self.root.resizable(False, False)
-        
+print(amarelo.number_players)
+# flag = False
+# while (not flag):
+#     print()
+#     flag = amarelo.play_turn([])
+#     amarelo.print_state()
+#     input()
 
-# Application()
+
+# Pontos para lembrar e possiveis modificações:
+# - Não existe número máximo de jogadores por rodada (modo de jogo?).
+# - Casas especiais?
+# - Modelo vetorial melhor?
+# - Última casa é a mesma ou não?
