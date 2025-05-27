@@ -3,28 +3,27 @@ import numpy as np
 
 NEIGHBOR_DISTANCE = 13  # Distância entre a entrada de um jogador e o próximo.
 
-class Player_Vector:    # Jogador de Ludo (usando a representação vetorial).
+class Player:    # Jogador de Ludo (usando a representação vetorial).
 
-    number_players = 0 
-    players = []
-
-    def __init__(self, name):
+    def __init__(self, name, order, color):
         self.name = name
-        self.order = self.number_players
-        Player_Vector.number_players += 1
-        self.players.append(self)
+        self.order = order
+        self.color = color
 
         self.walk = np.zeros(58)
         self.walk[0] = 4
 
+    def set_oponents(self, oponents):
+        self.oponents = oponents
+
     def play_turn(self):
 
         dice_roll = random.randint(1, 6)
-        print("Valor do dado: ", dice_roll)
+        # print("Valor do dado: ", dice_roll)
 
         choice = self.choose_random(dice_roll)
 
-        print("Escolha:",  choice)
+        # print("Escolha:",  choice)
 
         if (choice == 0):
             self.free_pawn()
@@ -36,7 +35,7 @@ class Player_Vector:    # Jogador de Ludo (usando a representação vetorial).
                 return True
                 
         if (dice_roll == 6):
-            self.print_state()
+            # self.print_state()
             return self.play_turn()
         else:
             return False
@@ -54,6 +53,9 @@ class Player_Vector:    # Jogador de Ludo (usando a representação vetorial).
 
         indexes_walk = np.nonzero(self.walk[:-1])
         indexes_walk = list(indexes_walk[0])
+
+        if (not indexes_walk):
+            return None
 
         if dice_roll != 1 and dice_roll != 6:
             if indexes_walk[0] == 0:
@@ -79,49 +81,42 @@ class Player_Vector:    # Jogador de Ludo (usando a representação vetorial).
     def check_collision(self, position):
 
         if (position <= 51):
-            for player in self.players:
-                if (player != self):
-                    relative_position = (position + 13*(4 - (player.order - self.order))) % 52
+            for player in self.oponents:
+                relative_position = (position + 13*(4 - (player.order - self.order))) % 52
 
-                    if (relative_position <= 51 and relative_position > 0):
-                        if (player.walk[relative_position] != 0):
-                            print("HIIIIIIIIIIIIIIITTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT!!!!!", position, relative_position, player.order, self.order, player.name)
-                            player.walk[0] += player.walk[relative_position]
-                            player.walk[relative_position] = 0
+                if (relative_position <= 51 and relative_position > 0):
+                    if (player.walk[relative_position] != 0):
+                        player.walk[0] += player.walk[relative_position]
+                        player.walk[relative_position] = 0
 
     def print_state(self):
         print(self.walk)
 
-verde = Player_Vector("verde")
-amarelo = Player_Vector("amarelo")
-azul = Player_Vector("azul")
-vermelho = Player_Vector("vermelho")
+class Board:
 
+    def __init__(self):
 
-flag1 = False
-flag2 = False
-flag3 = False
-flag4 = False
-while (not (flag1 or flag2 or flag3 or flag4)):
-    print("Verde:")
-    flag1 = verde.play_turn()
-    verde.print_state()
-    input()
+        self.turn = 0
 
-    print("Amarelo")
-    flag2 = amarelo.play_turn()
-    amarelo.print_state()
-    input()
+        green_player = Player("green", 0, "green")
+        yellow_player = Player("yellow", 1, "yellow")
+        blue_player = Player("blue", 2, "deepskyblue")
+        red_player = Player("red", 3, "red")
 
-    print("Azul")
-    flag3 = azul.play_turn()
-    azul.print_state()
-    input()
+        green_player.set_oponents([yellow_player, blue_player, red_player])
+        yellow_player.set_oponents([green_player, blue_player, red_player])
+        blue_player.set_oponents([yellow_player, green_player, red_player])
+        red_player.set_oponents([yellow_player, blue_player, green_player])
 
-    print("Vermelho")
-    flag3 = vermelho.play_turn()
-    vermelho.print_state()
-    input()
+        self.players_list = [green_player, yellow_player, blue_player, red_player]
 
-print("Tamo junto")
+    def play(self):
 
+        outcome = self.players_list[self.turn].play_turn()
+
+        if (outcome):
+            return self.players_list[self.turn]
+        else:
+            self.turn = (self.turn + 1) % 4
+            return None
+        
