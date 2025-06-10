@@ -1,5 +1,7 @@
 from tkinter import *
 from ludo import *
+import random
+
 
 CELL_SIDE = 60
 PAWN_WIDTH = 3
@@ -202,8 +204,8 @@ class Application():
         for i in range(6):
             green_cell_list[i].grid(row=7, column=1 + i)
             yellow_cell_list[i].grid(row=1 + i, column=7)
-            blue_cell_list[i].grid(row=7, column=8 + i)
-            red_cell_list[i].grid(row=8 + i, column=7)
+            blue_cell_list[i].grid(row=7, column=13 - i)
+            red_cell_list[i].grid(row=13 - i, column=7)
 
         # Células centrais (pretas)
         for row, col in [(6, 6), (8, 6), (6, 8), (8, 8), (7, 7)]:
@@ -227,7 +229,15 @@ class Application():
         self.board.play()
         self.printar_estado()
 
-test_board = Board()
+random_color = "#{:02x}{:02x}{:02x}".format(
+    random.randint(0, 255),
+    random.randint(0, 255),
+    random.randint(0, 255)
+)
+
+players = [Player("green", "random"), Player("yellow", "random"), Player("blue", "random"), Player("red", "random")]
+
+test_board = Board(players, "fixed")
 
 app = Application(test_board)
 
