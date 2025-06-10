@@ -79,6 +79,11 @@ class GeneticAlgorithm:
             # Avalia fitness
             self.evaluate_fitness()
             
+
+            self.population.sort(key=lambda p: p.wins, reverse=True)
+            for player in self.population[:4]:
+                print(f"Player DNA: {player.DNA}, Wins: {player.wins}")
+            
             # Seleciona pais
             parents = self.select_parents(self.population_size)
             
@@ -96,9 +101,6 @@ class GeneticAlgorithm:
 
             self.population = new_population[:self.population_size]
 
-            self.population.sort(key=lambda p: p.wins, reverse=True)
-            for player in self.population[:4]:
-                print(f"Player DNA: {player.DNA}, Wins: {player.wins}")
 
             # Reset wins
             for player in self.population:
@@ -125,6 +127,6 @@ class GeneticAlgorithm:
                 for player in players:
                     player.restart_walk()
 
-gen = GeneticAlgorithm(32, 50, 0.1, "arbitrary")
+gen = GeneticAlgorithm(32, 100, 0.1, "arbitrary")
 gen.initialize_population()
 gen.evolve()
