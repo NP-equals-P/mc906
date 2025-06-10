@@ -12,6 +12,7 @@ class Player:
 
         self.name = name
         self.wins = 0
+        self.fitness = 0.0
 
         if (think_type == "arbitrary"):
             self.choose_action = self.choose_action_arbitrary
