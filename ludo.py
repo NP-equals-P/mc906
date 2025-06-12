@@ -138,7 +138,40 @@ class Player:
         return best;
 
     def choose_action_neural(self, dice_roll):
-        pass
+
+        pesos, bias = self.DNA
+
+        # Concatena os 4 vetores walk de cada player e o dice_roll em um único vetor de entrada
+        input_vec = np.concatenate([
+            self.walk,
+            self.oponents[0].walk,
+            self.oponents[1].walk,
+            self.oponents[2].walk,
+            np.array([dice_roll])
+        ])
+
+        # Calcula a saída da rede neural: saída = pesos @ input_vec + bias
+        output = np.dot(pesos.T, input_vec) + bias
+
+        best = np.argmax(output)
+
+        indexes_walk = np.nonzero(self.walk[:-1])
+        indexes_walk = list(indexes_walk[0])
+
+        # print(best)
+
+        if best + 1 > len(indexes_walk):
+            # print("        00000000")
+            if (0 in indexes_walk):
+                best = random.choice(indexes_walk)
+            else:
+                best = random.choice(indexes_walk)
+
+        else:
+            # print("00000000")
+            best = indexes_walk[best]
+
+        return best
 
     def choose_action_search(self, dice_roll):
         pass
