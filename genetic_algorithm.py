@@ -46,8 +46,9 @@ class GeneticAlgorithm:
     
     def random_individual(self):
 
+
         if (self.think_type == "arbitrary"):
-            dna = np.random.randn(6)
+            dna = np.random.randn(8)
         elif (self.think_type == "neural"):
             dna = (np.random.randn(233, 4), np.random.randn(4))
             
