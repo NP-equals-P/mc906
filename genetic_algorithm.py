@@ -20,7 +20,7 @@ class GeneticAlgorithm:
             random.randint(0, 255)
         )
 
-        dna = np.random.randn(6)
+        dna = np.random.randn(8)
 
         random_player = Player(
             name = "",

@@ -45,6 +45,23 @@ class Player:
             )
         self.order = order
 
+    def set_safe_spots(self):
+        self.safe_spots = np.zeros(58)
+        self.safe_spots[0] = 1
+        self.safe_spots[1] = 1
+        self.safe_spots[9] = 1
+        self.safe_spots[22] = 1
+        self.safe_spots[27] = 1
+        self.safe_spots[35] = 1
+        self.safe_spots[40] = 1
+        self.safe_spots[48] = 1
+        self.safe_spots[52] = 1
+        self.safe_spots[53] = 1
+        self.safe_spots[54] = 1
+        self.safe_spots[55] = 1
+        self.safe_spots[56] = 1
+        self.safe_spots[57] = 1
+
     def play_turn(self):
 
         # Joga o dado.
@@ -108,23 +125,23 @@ class Player:
 
         if dice_roll != 1 and dice_roll != 6:
             if 0 in indexes_walk:
-                indexes_walk.remove(0);
+                indexes_walk.remove(0)
 
         if len(indexes_walk) == 0:
-            return None;
+            return None
 
-        scores = [];
+        scores = []
         for i in indexes_walk:
-            features = self.extract_features(i, dice_roll);
-            score = np.dot(weights, features);
-            scores.append((i, score));
+            features = self.extract_features(i, dice_roll)
+            score = np.dot(weights, features)
+            scores.append((i, score))
 
         best, best_score = max(scores, key=lambda x: x[1]);
-        return best;
+        return best
 
     def extract_features(self, position, dice_roll):
-        future_position = position + dice_roll;
-        distance = 57 - future_position;
+        future_position = position + dice_roll
+        distance = 57 - future_position
 
         risk = 0;
         if future_position <= 51:
@@ -133,20 +150,23 @@ class Player:
                     relative_position = (pos + 13*(4 - (player.order - self.order))) % 52;
                     if relative_position <= 51 and relative_position > 0:
                         if 0 < future_position - relative_position <= 6:    
-                            risk += 1;
+                            risk += 1
 
         capture = 0;
         if future_position <= 51:
             for player in self.oponents:
-                if player.walk[future_position] != 0:
-                    capture += player.walk[future_position];
+                if player.walk[future_position] != 0 and player.safe_spots[future_position] != 1:
+                    capture += player.walk[future_position]
 
-
-        can_leave = int(position == 0 and (dice_roll == 6 or dice_roll == 1));
+        can_leave = int(position == 0 and (dice_roll == 6 or dice_roll == 1))
         is_hallway = int(future_position > 51);
         can_stack = int(position == 1 and self.walk[0] > 0);
+        is_safe = int(self.safe_spots[position] == 1);
+        if future_position > 57:
+            future_position = 57 - (future_position - 57)
+        will_be_safe = int(self.safe_spots[future_position] == 1);
 
-        return np.array([distance, risk, capture, can_leave, is_hallway, can_stack]);
+        return np.array([distance, risk, capture, can_leave, is_hallway, can_stack, is_safe, will_be_safe])
 
     def walk_pawn(self, choice, dice_roll):
         if (choice + dice_roll <= 57):
@@ -168,9 +188,10 @@ class Player:
                 relative_position = (position + 13*(4 - (player.order - self.order))) % 52
 
                 if (relative_position <= 51 and relative_position > 0):
-                    if (player.walk[relative_position] != 0):
-                        player.walk[0] += player.walk[relative_position]
-                        player.walk[relative_position] = 0
+                    if (player.safe_spots[relative_position] != 1):
+                        if (player.walk[relative_position] != 0):
+                            player.walk[0] += player.walk[relative_position]
+                            player.walk[relative_position] = 0
 
 class Board:
 
@@ -198,6 +219,11 @@ class Board:
         yellow_player.set_oponents([green_player, blue_player, red_player])
         blue_player.set_oponents([yellow_player, green_player, red_player])
         red_player.set_oponents([yellow_player, blue_player, green_player])
+
+        green_player.set_safe_spots()
+        yellow_player.set_safe_spots()
+        blue_player.set_safe_spots()
+        red_player.set_safe_spots()
 
         self.players_list = [green_player, yellow_player, blue_player, red_player]
 
