@@ -1,8 +1,9 @@
 import numpy as np
 import random
 import time
+import multiprocessing
 
-EXPECTIMAX_DEPTH = 3
+EXPECTIMAX_DEPTH = 2
 
 NEIGHBOR_DISTANCE = 13  # Distância entre a entrada de um jogador e o próximo.
 
@@ -14,6 +15,7 @@ class Player:
         self.wins = 0
         self.board = None
         self.DNA = [0, 0, 0, 0, 0, 0]
+        self.expectimax_depth = EXPECTIMAX_DEPTH
 
         if (think_type == "arbitrary"):
             self.choose_action = self.choose_action_arbitrary
@@ -34,6 +36,9 @@ class Player:
 
     def set_DNA(self, DNA):
         self.DNA = DNA
+
+    def set_expectimax_depth(self, value):
+        self.expectimax_depth = value
 
     def set_cosmedics(self, order, color=None):
         if color is not None:
@@ -233,13 +238,15 @@ class SimulatedPlayer(Player):
         self.DNA = np.copy(player.DNA)
         self.stacking_factor = stacking_factor
         self.board = None
+        self.expectimax_depth = player.expectimax_depth
 
     def get_possible_moves(self, dice_roll):
         pawns = np.nonzero(self.walk)[0]
         possible_moves = []
         for pawn in pawns:
             if pawn != 0:
-                possible_moves.append(pawn)
+                if pawn + dice_roll <= 57:
+                    possible_moves.append(pawn)
             elif dice_roll == 1 or dice_roll == 6:
                 possible_moves.append(pawn)
 
@@ -268,9 +275,9 @@ class SimulatedPlayer(Player):
         for pawn in pawns:
             scores = (scores + self.extract_features(pawn, 0))
 
-        scores[2] = int(scores[2] > 0)
-        scores[3] = int(scores[3] > 0)
+        scores[3] = (4 - self.walk[0]) / 4 # has_left_count instead of can_leave (normalized)
         scores[4] = int(scores[4] > 0)
+        scores[5] = int(scores[5] > 0)
         
         return self.DNA @ scores
 
@@ -296,7 +303,6 @@ class SimulatedBoard(Board):
         outcome = self.players_list[self.turn].play_move(move, dice_roll)
 
         if outcome == "game_over":
-            self.players_list[self.turn].wins += 1
             return "game_over"
         elif outcome == "next_turn":
             self.turn = (self.turn + 1) % 4
@@ -317,7 +323,7 @@ def expectimax_min(search_player: SimulatedPlayer, board: SimulatedBoard, dice_r
     best_value = float("inf")
     possible_moves = current_player.get_possible_moves(dice_roll)
 
-    if possible_moves == None:
+    if not possible_moves:
         next_board = SimulatedBoard(board)
         next_board.play(None, dice_roll)
         value = 0
@@ -358,7 +364,7 @@ def expectimax_max(search_player: SimulatedPlayer, board: SimulatedBoard, dice_r
     best_value = -float("inf")
     possible_moves = current_player.get_possible_moves(dice_roll)
 
-    if possible_moves == None:
+    if not possible_moves:
         next_board = SimulatedBoard(board)
         next_board.play(None, dice_roll)
         value = 0
@@ -389,7 +395,7 @@ def expectimax_max(search_player: SimulatedPlayer, board: SimulatedBoard, dice_r
 def expectimax(search_player: SimulatedPlayer, board: SimulatedBoard, dice_roll):
     best_move = None
     possible_moves = search_player.get_possible_moves(dice_roll)
-    if possible_moves == None:
+    if not possible_moves:
         return best_move
 
     best_value = -float("inf")
@@ -400,7 +406,10 @@ def expectimax(search_player: SimulatedPlayer, board: SimulatedBoard, dice_roll)
         
         value = 0
         for roll in range(1, 7):
-            value += (1 / 6) * expectimax_min(search_player, next_board, roll, EXPECTIMAX_DEPTH - 1)
+            if next_board.turn == search_player.order:
+                value += (1 / 6) * expectimax_max(search_player, next_board, roll, search_player.expectimax_depth - 1)
+            else:
+                value += (1 / 6) * expectimax_min(search_player, next_board, roll, search_player.expectimax_depth - 1)
             
         if value > best_value:
             best_value = value
@@ -409,30 +418,76 @@ def expectimax(search_player: SimulatedPlayer, board: SimulatedBoard, dice_roll)
     return best_move
 
 # DNA: [distance, risk, capture, can_leave, is_hallway, can_stack]
-players1 = Player("green", "search")
-players1.set_DNA(np.array([-1000, 100, 500, 1000, 1000, 500]))
+player1_wins = multiprocessing.Value('i', 0)
+player2_wins = multiprocessing.Value('i', 0)
+player3_wins = multiprocessing.Value('i', 0)
+player4_wins = multiprocessing.Value('i', 0)
 
-players2 = Player("yellow", "random")
+def play_game(num_games, player1_wins, player2_wins, player3_wins, player4_wins):
+    """
+    Função que cada processo irá executar.
+    Ela "retorna" 1, adicionando ao valor compartilhado.
+    """
+    players1 = Player("green", "search")
+    # players1.set_DNA(np.array([-20, -50, 200, 500, 1000, 500]))
+    # players1.set_expectimax_depth(2)
 
-players3 = Player("blue", "random")
+    players2 = Player("yellow", "random")
+    # players2.set_DNA(np.array([-20, -50, 200, 500, 1000, 500]))
+    # players2.set_expectimax_depth(1)
 
-players4 = Player("red", "random")
+    players3 = Player("blue", "random")
+    # players3.set_DNA(np.array([-20, -50, 200, 500, 1000, 500]))
+    # players3.set_expectimax_depth(1)
 
-players = [players1, players2, players3, players4]
+    players4 = Player("red", "random")
+    # players4.set_DNA(np.array([-20, -50, 200, 500, 1000, 500]))
+    # players4.set_expectimax_depth(1)
 
+    players = [players1, players2, players3, players4]
+    test_board = Board(players)
 
-test_board = Board(players)
+    for i in range(num_games):
+        winner = None
+        while (winner == None):
+            winner = test_board.play()
+        for p in test_board.players_list:
+            p.restart_walk()
 
-start_time = time.time()
+    # Acessa o valor do Value usando .value
+    # O lock para acesso seguro já está embutido ao usar .value dentro de um 'with'
+    with player1_wins.get_lock():
+        player1_wins.value += players1.wins
 
-for i in range(1000):
-    winner = None
-    while (winner == None):
-        winner = test_board.play()
-    for p in test_board.players_list:
-        p.restart_walk()
+    with player2_wins.get_lock():
+        player2_wins.value += players2.wins
 
-end_time = time.time()
+    with player3_wins.get_lock():
+        player3_wins.value += players3.wins
 
-print(players1.wins, players2.wins, players3.wins, players4.wins)
-print(f"Execution time: {(end_time - start_time):.2f} seconds")
+    with player4_wins.get_lock():
+        player4_wins.value += players4.wins
+
+if __name__ == "__main__":
+    processes = []
+    num_processes = 4 # Queremos 4 processos para que a soma seja 4
+
+    print("Iniciando processos...")
+    start_time = time.time()
+    for i in range(num_processes):
+        # Cria um processo, nomeando-o para facilitar o rastreamento no print
+        p = multiprocessing.Process(target=play_game, args=(25, player1_wins, player2_wins, player3_wins, player4_wins), name=f"Processo-{i+1}")
+        processes.append(p)
+        p.start() # Inicia a execução do processo
+
+    # Espera que todos os processos terminem suas execuções
+    for p in processes:
+        p.join() 
+
+    end_time = time.time()
+    
+    print("\nTodos os processos terminaram.")
+    # Acessa o valor final da soma compartilhada
+    
+    print(player1_wins.value, player2_wins.value, player3_wins.value, player4_wins.value) # depth 3 1000 jogos: 700 vitórias vs aleatório
+    print(f"Execution time: {(end_time - start_time):.2f} seconds") # depth 3 1000 jogos: 1840 segundos
