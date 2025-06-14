@@ -1,7 +1,8 @@
 import numpy as np
 import random
+import time
 
-EXPECTIMAX_DEPTH = 2
+EXPECTIMAX_DEPTH = 3
 
 NEIGHBOR_DISTANCE = 13  # Distância entre a entrada de um jogador e o próximo.
 
@@ -12,6 +13,7 @@ class Player:
         self.name = name
         self.wins = 0
         self.board = None
+        self.DNA = [0, 0, 0, 0, 0, 0]
 
         if (think_type == "arbitrary"):
             self.choose_action = self.choose_action_arbitrary
@@ -220,7 +222,7 @@ class Board:
             return None
 
 class SimulatedPlayer(Player):
-    def __init__(self, player: Player):
+    def __init__(self, player: Player, stacking_factor=100):
         self.name = player.name
         self.wins = player.wins
         self.choose_action = player.choose_action
@@ -228,7 +230,8 @@ class SimulatedPlayer(Player):
         self.oponents = None
         self.color = player.color
         self.order = player.order
-        self.DNA = None
+        self.DNA = np.copy(player.DNA)
+        self.stacking_factor = stacking_factor
         self.board = None
 
     def get_possible_moves(self, dice_roll):
@@ -258,6 +261,18 @@ class SimulatedPlayer(Player):
             return "same_turn"
         else:
             return "next_turn"
+        
+    def score(self):
+        scores = np.array([0, 0, 0, 0, 0, 0])
+        pawns = np.nonzero(self.walk)[0]
+        for pawn in pawns:
+            scores = (scores + self.extract_features(pawn, 0))
+
+        scores[2] = int(scores[2] > 0)
+        scores[3] = int(scores[3] > 0)
+        scores[4] = int(scores[4] > 0)
+        
+        return self.DNA @ scores
 
 
 class SimulatedBoard(Board):
@@ -288,38 +303,10 @@ class SimulatedBoard(Board):
             return None      
         else:
             return None
-        
-    def score(self, search_player: SimulatedPlayer):
-        total_distance = 0
-        pawns = np.nonzero(search_player.walk)[0]
-        for pawn in pawns:
-            total_distance += 57 - pawn
-
-        total_oponent_distance = 0
-        for oponent in search_player.oponents:
-            pawns = np.nonzero(oponent.walk)[0]
-            for pawn in pawns:
-                total_oponent_distance += 57 - pawn
-
-        stacking_factor = 100
-        stacking_score = 0
-        for pawn in pawns:
-            stacking_score += search_player.walk[pawn] * stacking_factor
-
-        risk = 0;
-        for pawn in pawns:
-            for oponent in search_player.oponents:
-                for pos in np.nonzero(oponent.walk[:52])[0]:
-                    relative_position = (pos + 13*(4 - (oponent.order - search_player.order))) % 52;
-                    if relative_position <= 51 and relative_position > 0:
-                        if 0 < pawn - relative_position <= 6:    
-                            risk += 1;
-        
-        return (-100) * total_distance + 10 * total_oponent_distance + 100 * stacking_score + (-100) * risk
 
 def expectimax_min(search_player: SimulatedPlayer, board: SimulatedBoard, dice_roll, depth):
     if depth == 0:
-        return board.score(search_player)
+        return search_player.score()
     
     current_player: SimulatedPlayer = None
     for player in board.players_list:
@@ -360,7 +347,7 @@ def expectimax_min(search_player: SimulatedPlayer, board: SimulatedBoard, dice_r
 
 def expectimax_max(search_player: SimulatedPlayer, board: SimulatedBoard, dice_roll, depth):
     if depth == 0:
-        return board.score(search_player)
+        return search_player.score()
     
     current_player: SimulatedPlayer = None
     for player in board.players_list:
@@ -421,20 +408,31 @@ def expectimax(search_player: SimulatedPlayer, board: SimulatedBoard, dice_roll)
 
     return best_move
 
+# DNA: [distance, risk, capture, can_leave, is_hallway, can_stack]
 players1 = Player("green", "search")
+players1.set_DNA(np.array([-1000, 100, 500, 1000, 1000, 500]))
+
 players2 = Player("yellow", "random")
+
 players3 = Player("blue", "random")
+
 players4 = Player("red", "random")
+
 players = [players1, players2, players3, players4]
 
 
 test_board = Board(players)
 
-for i in range(100):
+start_time = time.time()
+
+for i in range(1000):
     winner = None
     while (winner == None):
         winner = test_board.play()
     for p in test_board.players_list:
         p.restart_walk()
 
+end_time = time.time()
+
 print(players1.wins, players2.wins, players3.wins, players4.wins)
+print(f"Execution time: {(end_time - start_time):.2f} seconds")
