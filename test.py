@@ -20,3 +20,7 @@ while (winner == None):
     winner = test_board.play()
 
 print(players1.wins, players2.wins, players3.wins, players4.wins)
+
+# Variações possíveis:
+# 1. Sistema de pontuação diferente (distantas percorridas pelos peões)
+# 2. Fazer função condicional que force a escolha entre um número determinado de opções.

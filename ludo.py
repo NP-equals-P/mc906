@@ -1,5 +1,5 @@
 # A classe Player representa nossos indivíduos.
-# A classe Board é usada para criar 4 Players.
+# A classe Board é usada para agrupar 4 Players e fazer um jogo entre eles.
 
 import random
 import numpy as np
@@ -8,7 +8,15 @@ NEIGHBOR_DISTANCE = 13  # Distância entre a entrada de um jogador e o próximo.
 
 class Player:
 
-    def __init__(self, name, think_type):
+    def __init__(self, name, think_type="random"):
+
+        # "name" é somente para identificar um player. Não indica nada concreto.
+        # "think_type" define que tipo de algoritmo de decisão o player usará (pode ser "random", "arbitrary", "neural" ou "search"):
+        #  - "random": escolhe aleatoriamente qual peão andar.
+        #  - "arbitrary": usa a função arbitrária que a gente criou.
+        #  - "neural": usa uma rede neural para escolher qual peão andar.
+        #  - "search": usa um algoritmo de busca para escolher qual peão andar.
+        # "walk" é o vetor que representa o caminho que esse player percorre.
 
         self.name = name
         self.wins = 0
@@ -16,15 +24,19 @@ class Player:
 
         if (think_type == "arbitrary"):
             self.choose_action = self.choose_action_arbitrary
-        elif (think_type == "random"):
-            self.choose_action = self.choose_random
-        # elif (think_type == "neural"):
-            # self.choose_action = self.choose_action_neural
+        elif (think_type == "search"):
+            self.choose_action = self.choose_action_search
+        elif (think_type == "neural"):
+            self.choose_action = self.choose_action_neural
+        else:
+            self.choose_action = self.choose_action_random
 
         self.walk = np.zeros(58)
         self.walk[0] = 4
 
     def restart_walk(self):
+        # Reinicia o vetor de andamentos do jogador.
+
         self.walk = np.zeros(58)
         self.walk[0] = 4
 
@@ -35,6 +47,8 @@ class Player:
         self.DNA = DNA
 
     def set_cosmedics(self, order, color=None):
+        # Define a ordem do jogador e a cor que ele usará.
+
         if color is not None:
             self.color = color
         else:
@@ -70,7 +84,7 @@ class Player:
         # Escolhe qual peão andar (ou liberar).
         choice = self.choose_action(dice_roll)
 
-        # Se escolha for 0, libere um peão. Se for None, perca a vez. Se for qualquer outro número, ande o peão da respectiva casa e cheque se ganhou.
+        # Se escolha for 0, libere um peão. Se for <None>, perca a vez. Se for qualquer outro número, ande o peão da respectiva casa e cheque se ganhou.
         if (choice == 0):
             self.free_pawn()
         elif choice == None:
@@ -88,7 +102,8 @@ class Player:
             return False
 
     def free_pawn(self):
-         
+        # Libera um peão da primeira casa.
+
         self.walk[0] -= 1
         self.walk[1] += 1
 
@@ -96,7 +111,7 @@ class Player:
 
         return
 
-    def choose_random(self, dice_roll):
+    def choose_action_random(self, dice_roll):
 
         # Pega os índices em que há peões (não-zeros), sem considerar a última casa.
         indexes_walk = np.nonzero(self.walk[:-1])
@@ -139,6 +154,45 @@ class Player:
         best, best_score = max(scores, key=lambda x: x[1]);
         return best
 
+    def choose_action_neural(self, dice_roll):
+
+        pesos, bias = self.DNA
+
+        # Concatena os 4 vetores walk de cada player e o dice_roll em um único vetor de entrada
+        input_vec = np.concatenate([
+            self.walk,
+            self.oponents[0].walk,
+            self.oponents[1].walk,
+            self.oponents[2].walk,
+            np.array([dice_roll])
+        ])
+
+        # Calcula a saída da rede neural: saída = pesos @ input_vec + bias
+        output = np.dot(pesos.T, input_vec) + bias
+
+        best = np.argmax(output)
+
+        indexes_walk = np.nonzero(self.walk[:-1])
+        indexes_walk = list(indexes_walk[0])
+
+        # print(best)
+
+        if best + 1 > len(indexes_walk):
+            # print("        00000000")
+            if (0 in indexes_walk):
+                best = random.choice(indexes_walk)
+            else:
+                best = random.choice(indexes_walk)
+
+        else:
+            # print("00000000")
+            best = indexes_walk[best]
+
+        return best
+
+    def choose_action_search(self, dice_roll):
+        pass
+
     def extract_features(self, position, dice_roll):
         future_position = position + dice_roll
         distance = 57 - future_position
@@ -169,6 +223,10 @@ class Player:
         return np.array([distance, risk, capture, can_leave, is_hallway, can_stack, is_safe, will_be_safe])
 
     def walk_pawn(self, choice, dice_roll):
+        # Andar o peão da casa "choice" com o dado "dice_roll".
+        # Se a casa alvo não passar do final, ande normalmente.
+        # Se a casa alvo passar do final, ande até o final e volte para a casa "aux".
+
         if (choice + dice_roll <= 57):
             self.walk[choice + dice_roll] += self.walk[choice]
             self.walk[choice] = 0
@@ -182,6 +240,7 @@ class Player:
                 self.walk[choice] = 0
 
     def check_collision(self, position):
+        # Verifica se há colisão com outros jogadores e atualiza o vetor dos respectivos adversários.
 
         if (position <= 51):
             for player in self.oponents:
@@ -196,6 +255,11 @@ class Player:
 class Board:
 
     def __init__(self, players, color_type="random"):
+
+        # Recebe os players e define a ordem de cada um (ordem de chegada).
+        # Define as cores para cada player.
+        # Guarda o estado "turn" que indica qual é o player da vez.
+        # Usa a função "play()" para fazer uma jogada com o player da vez.
 
         self.turn = 0
 
