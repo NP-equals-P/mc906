@@ -1,5 +1,5 @@
 from ludo import *
-import time
+# import time
 # import multiprocessing
 
 random_color = "#{:02x}{:02x}{:02x}".format(
