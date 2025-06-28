@@ -21,6 +21,9 @@ class Player:
         self.name = name
         self.wins = 0
         self.fitness = 0.0
+        self.board = None
+        self.search_depth = 2
+        self.DNA = None
 
         if (think_type == "arbitrary"):
             self.choose_action = self.choose_action_arbitrary
@@ -45,6 +48,12 @@ class Player:
 
     def set_DNA(self, DNA):
         self.DNA = DNA
+
+    def set_search_depth(self, value):
+        self.search_depth = value
+
+    def set_board(self, board):
+        self.board = board
 
     def set_cosmedics(self, order, color=None):
         # Define a ordem do jogador e a cor que ele usará.
@@ -191,7 +200,8 @@ class Player:
         return best
 
     def choose_action_search(self, dice_roll):
-        pass
+        sim_board = SimulatedBoard(self.board)
+        return expectimax(sim_board.players_list[sim_board.turn], sim_board, dice_roll)
 
     def extract_features(self, position, dice_roll):
         future_position = position + dice_roll
@@ -289,6 +299,11 @@ class Board:
         blue_player.set_safe_spots()
         red_player.set_safe_spots()
 
+        green_player.set_board(self)
+        yellow_player.set_board(self)
+        blue_player.set_board(self)
+        red_player.set_board(self)
+
         self.players_list = [green_player, yellow_player, blue_player, red_player]
 
     def play(self):
@@ -302,3 +317,214 @@ class Board:
         else:
             self.turn = (self.turn + 1) % 4
             return None
+        
+class SimulatedPlayer(Player):
+    def __init__(self, player: Player):
+        self.name = player.name
+        self.wins = player.wins
+        self.choose_action = player.choose_action
+        self.walk = np.copy(player.walk)
+        self.oponents = None
+        self.color = player.color
+        self.order = player.order
+        self.DNA = np.copy(player.DNA)
+        self.board = None
+        self.search_depth = player.search_depth
+        self.safe_spots = np.copy(player.safe_spots)
+
+    def get_possible_moves(self, dice_roll):
+        pawns = np.nonzero(self.walk)[0]
+        possible_moves = []
+        for pawn in pawns:
+            if pawn != 0:
+                if pawn + dice_roll <= 57:
+                    possible_moves.append(pawn)
+            elif dice_roll == 1 or dice_roll == 6:
+                possible_moves.append(pawn)
+
+        return possible_moves
+
+    def play_move(self, move, dice_roll):
+        if (move == 0):
+            self.free_pawn()
+        elif move == None:
+            return "next_turn"
+        else:
+            self.walk_pawn(move, dice_roll)
+
+            if (self.walk[57] == 4):
+                return "game_over"
+                
+        # Se rodou 6, jogue novamente.
+        if (dice_roll == 6):
+            return "same_turn"
+        else:
+            return "next_turn"
+        
+    def score(self):
+        scores = np.array([0, 0, 0, 0, 0, 0, 0, 0])
+        positions = np.nonzero(self.walk)[0]
+        for pos in positions:
+            distance = 57 - pos;
+
+            risk = 0
+            if pos <= 51:
+                for player in self.oponents:
+                    for pos in np.nonzero(player.walk[:52])[0]:
+                        relative_position = (pos + 13*(4 - (player.order - self.order))) % 52;
+                        if relative_position <= 51 and relative_position > 0:
+                            if 0 < pos - relative_position <= 6:    
+                                risk += 1
+
+            capture = 0;
+            if pos <= 51:
+                for player in self.oponents:
+                    capture += player.walk[0]
+
+            is_hallway = int(pos > 51)
+            has_stacked = int(self.walk[pos] > 1)
+            is_safe = int(self.safe_spots[pos] == 1)
+
+            scores = (scores + np.array([distance, risk, capture, 0, is_hallway, has_stacked, is_safe, 0])) # can_leave e will_be_safe não são relevantes
+            # score() avalia estado atual ao invés de estado futuro
+
+        has_left = 4 - self.walk[0]
+        scores[3] = has_left
+
+        return self.DNA @ scores
+
+
+class SimulatedBoard(Board):
+    def __init__(self, board: Board):
+        self.turn = board.turn
+        self.players_list = []
+        for player in board.players_list:
+            self.players_list.append(SimulatedPlayer(player))
+
+        sim_players = self.players_list
+        sim_players[0].set_oponents([sim_players[1], sim_players[2], sim_players[3]])
+        sim_players[1].set_oponents([sim_players[0], sim_players[2], sim_players[3]])
+        sim_players[2].set_oponents([sim_players[0], sim_players[1], sim_players[3]])
+        sim_players[3].set_oponents([sim_players[0], sim_players[1], sim_players[2]])
+
+        for player in self.players_list:
+            player.board = self
+
+    def play(self, move, dice_roll):
+
+        outcome = self.players_list[self.turn].play_move(move, dice_roll)
+
+        if outcome == "game_over":
+            return "game_over"
+        elif outcome == "next_turn":
+            self.turn = (self.turn + 1) % 4
+            return None      
+        else:
+            return None
+
+def expectimax_min(search_player: SimulatedPlayer, board: SimulatedBoard, dice_roll, depth):
+    if depth == 0:
+        return search_player.score()
+    
+    current_player: SimulatedPlayer = None
+    for player in board.players_list:
+        if player.order == board.turn:
+            current_player = player
+            break
+
+    best_value = float("inf")
+    possible_moves = current_player.get_possible_moves(dice_roll)
+
+    if len(possible_moves) == 0:
+        next_board = SimulatedBoard(board)
+        next_board.play(None, dice_roll)
+        value = 0
+        for roll in range(1, 7):
+            if next_board.turn == search_player.order:
+                value += (1 / 6) * expectimax_max(search_player, next_board, roll, depth - 1)
+            else:
+                value += (1 / 6) * expectimax_min(search_player, next_board, roll, depth - 1)
+            
+        return value
+
+    for move in possible_moves:
+        next_board = SimulatedBoard(board)
+        if next_board.play(move, dice_roll) == "game_over":
+            return -999999999
+        value = 0
+        for roll in range(1, 7):
+            if next_board.turn == search_player.order:
+                value += (1 / 6) * expectimax_max(search_player, next_board, roll, depth - 1)
+            else:
+                value += (1 / 6) * expectimax_min(search_player, next_board, roll, depth - 1)
+            
+        if value < best_value:
+            best_value = value
+
+    return best_value
+
+def expectimax_max(search_player: SimulatedPlayer, board: SimulatedBoard, dice_roll, depth):
+    if depth == 0:
+        return search_player.score()
+    
+    current_player: SimulatedPlayer = None
+    for player in board.players_list:
+        if player.order == board.turn:
+            current_player = player
+            break
+
+    best_value = -float("inf")
+    possible_moves = current_player.get_possible_moves(dice_roll)
+
+    if len(possible_moves) == 0:
+        next_board = SimulatedBoard(board)
+        next_board.play(None, dice_roll)
+        value = 0
+        for roll in range(1, 7):
+            if next_board.turn == search_player.order:
+                value += (1 / 6) * expectimax_max(search_player, next_board, roll, depth - 1)
+            else:
+                value += (1 / 6) * expectimax_min(search_player, next_board, roll, depth - 1)
+            
+        return value
+
+    for move in possible_moves:
+        next_board = SimulatedBoard(board)
+        if next_board.play(move, dice_roll) == "game_over":
+            return 999999999
+        value = 0
+        for roll in range(1, 7):
+            if next_board.turn == search_player.order:
+                value += (1 / 6) * expectimax_max(search_player, next_board, roll, depth - 1)
+            else:
+                value += (1 / 6) * expectimax_min(search_player, next_board, roll, depth - 1)
+            
+        if value > best_value:
+            best_value = value
+
+    return best_value
+
+def expectimax(search_player: SimulatedPlayer, board: SimulatedBoard, dice_roll):
+    best_move = None
+    possible_moves = search_player.get_possible_moves(dice_roll)
+    if len(possible_moves) == 0:
+        return best_move
+
+    best_value = -float("inf")
+    for move in possible_moves:
+        next_board = SimulatedBoard(board)
+        if next_board.play(move, dice_roll) == "game_over":
+            return move
+        
+        value = 0
+        for roll in range(1, 7):
+            if next_board.turn == search_player.order:
+                value += (1 / 6) * expectimax_max(search_player, next_board, roll, search_player.search_depth - 1)
+            else:
+                value += (1 / 6) * expectimax_min(search_player, next_board, roll, search_player.search_depth - 1)
+            
+        if value > best_value:
+            best_value = value
+            best_move = move
+
+    return best_move
